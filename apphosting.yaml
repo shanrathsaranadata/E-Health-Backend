@@ -1,0 +1,46 @@
+# Development configuration for Backend (on Cloud Run).
+# This uses environment variables instead of secrets - NOT recommended for production
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  # maxInstances: 100
+  # concurrency: 80
+  # cpu: 1
+  # memoryMiB: 512
+
+# Environment variables and secrets.
+env:
+  # Configure environment variables.
+  # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
+  - variable: PORT
+    value: "5000"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Environment variables (replace with your actual values)
+  - variable: OPENAI_API_KEY
+    value: "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"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: MONGODB_URL
+    value: "mongodb+srv://shanrathsaranadata:DSXLg3BhIMIHA4wi@ehealth.uy54hkn.mongodb.net/ehealth_data?retryWrites=true&w=majority&appName=ehealth"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: JWT_SECRET
+    value: "ab1a3ca3aff76a7510bc4d6c1810031cf574679aba1f398989c83cde8e8fac3116483d436f8708796a5c6c71bd5e9c5cf04e11b64a033cddf31b8c408ea8db7b"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: AGORA_APP_ID
+    value: "2d418fbe85a4409697393784ddfd3ccd"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: AGORA_APP_CERTIFICATE
+    value: "f729ea817977426a830e5c220b217d4f"
+    availability:
+      - BUILD
+      - RUNTIME 
