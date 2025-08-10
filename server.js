@@ -10,6 +10,12 @@ const fs = require("fs");
 require("dotenv").config();
 const { RtcTokenBuilder, RtcRole } = require("agora-token");
 
+// Google Cloud Storage
+const { Storage } = require("@google-cloud/storage");
+const storage = new Storage();
+const bucketName =
+  process.env.GOOGLE_CLOUD_STORAGE_BUCKET || "e-health-uploads";
+
 const app = express();
 
 // OpenAI Configuration
@@ -17,28 +23,15 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Create uploads directory if it doesn't exist
+// Create uploads directory if it doesn't exist (for local development)
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Multer configuration for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
-  },
-});
-
+// Multer configuration for file uploads (memory storage for Cloud Storage)
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
@@ -65,10 +58,65 @@ const upload = multer({
   },
 });
 
+// Function to upload file to Google Cloud Storage
+async function uploadToCloudStorage(file, filename) {
+  try {
+    const bucket = storage.bucket(bucketName);
+    const blob = bucket.file(filename);
+
+    await blob.save(file.buffer, {
+      metadata: {
+        contentType: file.mimetype,
+      },
+    });
+
+    // Make the file publicly accessible
+    await blob.makePublic();
+
+    return `https://storage.googleapis.com/${bucketName}/${filename}`;
+  } catch (error) {
+    console.error("Error uploading to Cloud Storage:", error);
+    throw error;
+  }
+}
+
+// Function to delete file from Google Cloud Storage
+async function deleteFromCloudStorage(filename) {
+  try {
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(filename);
+    await file.delete();
+  } catch (error) {
+    console.error("Error deleting from Cloud Storage:", error);
+    throw error;
+  }
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Serve static files from uploads directory (for local development)
+if (process.env.NODE_ENV !== "production") {
+  app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+}
+
+// Serve uploaded files with proper error handling
+app.get("/uploads/:filename", (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(__dirname, "uploads", filename);
+
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({
+      message: "File not found",
+      error: "The requested file does not exist on the server",
+    });
+  }
+
+  // Serve the file
+  res.sendFile(filePath);
+});
 
 // MongoDB Connection
 mongoose
@@ -1049,16 +1097,23 @@ app.post(
         });
       }
 
+      // Generate unique filename
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      const filename = `file-${uniqueSuffix}${path.extname(
+        req.file.originalname
+      )}`;
+
+      // Upload file to Cloud Storage
+      const fileUrl = await uploadToCloudStorage(req.file, filename);
+
       // Create file record
       const file = new File({
-        filename: req.file.filename,
+        filename: filename,
         originalName: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
-        path: req.file.path,
-        url: `${req.protocol}://${req.get("host")}/uploads/${
-          req.file.filename
-        }`,
+        path: fileUrl, // Store the URL
+        url: fileUrl,
         appointmentId: appointmentId,
         uploadedBy: doctor.doctorId,
       });
@@ -1126,8 +1181,16 @@ app.delete("/prescriptions/file/:fileId", auth, async (req, res) => {
         .json({ message: "Not authorized to delete this file" });
     }
 
-    // Delete physical file
-    if (fs.existsSync(file.path)) {
+    // Delete from Cloud Storage if it's a Cloud Storage URL
+    if (file.path && file.path.startsWith("https://storage.googleapis.com/")) {
+      try {
+        await deleteFromCloudStorage(file.filename);
+      } catch (error) {
+        console.error("Error deleting from Cloud Storage:", error);
+        // Continue with deletion even if Cloud Storage deletion fails
+      }
+    } else if (file.path && fs.existsSync(file.path)) {
+      // Delete local file (for development)
       fs.unlinkSync(file.path);
     }
 
