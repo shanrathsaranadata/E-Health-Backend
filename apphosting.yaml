@@ -25,7 +25,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: MONGODB_URL
-    value: "mongodb+srv://shanrathsaranadata:DSXLg3BhIMIHA4wi@ehealth.uy54hkn.mongodb.net/ehealth_data?retryWrites=true&w=majority&appName=ehealth"
+    value: "mongodb+srv://shakaboom20001023:NuixTSjvaOhFAs7x@ehealth.ddqf26j.mongodb.net/ehealth_data?retryWrites=true&w=majority&appName=ehealth"
     availability:
       - BUILD
       - RUNTIME
