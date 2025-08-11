@@ -20,7 +20,7 @@ env:
 
   # Environment variables (replace with your actual values)
   - variable: OPENAI_API_KEY
-    value: "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"
+    value: "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"
     availability:
       - BUILD
       - RUNTIME
