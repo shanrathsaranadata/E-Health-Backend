@@ -1,0 +1,35 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      # Pass GitHub secret as env variable
+      - name: Build and deploy
+        env:
+          OPENAI_API_KEY: ${{ secrets.E_HEALTH_API_KEY }}
+        run: |
+          echo "Deploying with OPENAI_API_KEY..."
+          # Your deploy command here, for example:
+          npm run build
+          gcloud run deploy my-service \
+            --image=gcr.io/$PROJECT_ID/my-image \
+            --platform=managed \
+            --set-env-vars OPENAI_API_KEY=${OPENAI_API_KEY}
