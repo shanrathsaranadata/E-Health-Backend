@@ -1177,7 +1177,7 @@ app.get("/sensor-data/:patientId", auth, async (req, res) => {
 });
 
 // Update Sensor Data
-app.post("/sensor-data", auth, async (req, res) => {
+app.post("/sensor-data", async (req, res) => {
   try {
     const {
       patientId,
@@ -1188,17 +1188,35 @@ app.post("/sensor-data", auth, async (req, res) => {
       temperature,
     } = req.body;
 
-    const sensorData = new SensorData({
-      patientId,
-      ecg,
-      bloodPressure,
-      oxygenSaturation,
-      respirationRate,
-      temperature,
-    });
+    // Replace existing sensor data for the patient or create new
+    const sensorData = await SensorData.findOneAndUpdate(
+      { patientId }, // find by patientId
+      {
+        ecg,
+        bloodPressure,
+        oxygenSaturation,
+        respirationRate,
+        temperature,
+        updatedAt: new Date(),
+      },
+      { new: true, upsert: true } // create if doesn't exist
+    );
 
-    await sensorData.save();
-    res.status(201).json(sensorData);
+    if (sensorData) {
+      return res.status(201).json(sensorData);
+    } else {
+      const sensorData = new SensorData({
+        patientId,
+        ecg,
+        bloodPressure,
+        oxygenSaturation,
+        respirationRate,
+        temperature,
+      });
+
+      await sensorData.save();
+      res.status(201).json(sensorData);
+    }
   } catch (error) {
     console.error("Error updating sensor data:", error);
     res.status(500).json({ message: "Error updating sensor data" });
